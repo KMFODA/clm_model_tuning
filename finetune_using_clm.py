@@ -15,6 +15,7 @@ import random
 from itertools import chain
 
 import datasets
+import deepspeed
 import hydra
 import torch
 import transformers
@@ -127,6 +128,23 @@ def load_model_and_tokenizer(cfg: DictConfig):
         config=config,
     )
     model.resize_token_embeddings(len(tokenizer))
+    
+    ds_config = {
+        "zero_optimization": {
+            "stage": 2,
+            "offload_optimizer": {
+                "device": "cpu",
+                "pin_memory": true
+            },
+            "allgather_partitions": true,
+            "allgather_bucket_size": 5e8,
+            "overlap_comm": true,
+            "reduce_scatter": true,
+            "reduce_bucket_size": 5e8,
+            "contiguous_gradients": true
+        }
+    } 
+    model = deepspeed.initialize(model=model, config_params=ds_config)
 
     return tokenizer, model
 

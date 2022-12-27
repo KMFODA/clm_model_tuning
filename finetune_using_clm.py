@@ -134,14 +134,14 @@ def load_model_and_tokenizer(cfg: DictConfig):
             "stage": 2,
             "offload_optimizer": {
                 "device": "cpu",
-                "pin_memory": true
+                "pin_memory": True
             },
-            "allgather_partitions": true,
+            "allgather_partitions": True,
             "allgather_bucket_size": 5e8,
-            "overlap_comm": true,
-            "reduce_scatter": true,
+            "overlap_comm": True,
+            "reduce_scatter": True,
             "reduce_bucket_size": 5e8,
-            "contiguous_gradients": true
+            "contiguous_gradients": True
         }
     } 
     model = deepspeed.initialize(model=model, config_params=ds_config)

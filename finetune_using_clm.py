@@ -129,26 +129,26 @@ def load_model_and_tokenizer(cfg: DictConfig):
     )
     model.resize_token_embeddings(len(tokenizer))
     
-    ds_config = {
-        "optimizer": {
-            "type": "Adam",
-        },
-        "zero_optimization": {
-            "stage": 2,
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": True
-            },
-            "allgather_partitions": True,
-            "allgather_bucket_size": 5e8,
-            "overlap_comm": True,
-            "reduce_scatter": True,
-            "reduce_bucket_size": 5e8,
-            "contiguous_gradients": True
-        },
-        "train_batch_size" : 10,
-    }
-    model = deepspeed.initialize(model=model, config_params=ds_config)
+#     ds_config = {
+#         "optimizer": {
+#             "type": "Adam",
+#         },
+#         "zero_optimization": {
+#             "stage": 2,
+#             "offload_optimizer": {
+#                 "device": "cpu",
+#                 "pin_memory": True
+#             },
+#             "allgather_partitions": True,
+#             "allgather_bucket_size": 5e8,
+#             "overlap_comm": True,
+#             "reduce_scatter": True,
+#             "reduce_bucket_size": 5e8,
+#             "contiguous_gradients": True
+#         },
+#         "train_batch_size" : 10,
+#     }
+#     model = deepspeed.initialize(model=model, config_params=ds_config)
 
     return tokenizer, model
 

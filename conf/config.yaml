@@ -47,4 +47,4 @@ training:
 
 tracking:
   enabled: false
-  report_to: "all"
+  report_to: "wandb"

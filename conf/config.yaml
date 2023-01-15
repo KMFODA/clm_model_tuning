@@ -46,5 +46,5 @@ training:
     every_n_steps: null
 
 tracking:
-  enabled: false
+  enabled: true
   report_to: "wandb"

@@ -15,7 +15,6 @@ import random
 from itertools import chain
 
 import datasets
-import deepspeed
 import hydra
 import torch
 import transformers
@@ -36,7 +35,6 @@ from transformers import (
 )
 
 import bittensor
-
 
 def check_cfg_and_load_defaults(cfg: DictConfig) -> DictConfig:
 
@@ -128,27 +126,6 @@ def load_model_and_tokenizer(cfg: DictConfig):
         config=config,
     )
     model.resize_token_embeddings(len(tokenizer))
-    
-#     ds_config = {
-#         "optimizer": {
-#             "type": "Adam",
-#         },
-#         "zero_optimization": {
-#             "stage": 2,
-#             "offload_optimizer": {
-#                 "device": "cpu",
-#                 "pin_memory": True
-#             },
-#             "allgather_partitions": True,
-#             "allgather_bucket_size": 5e8,
-#             "overlap_comm": True,
-#             "reduce_scatter": True,
-#             "reduce_bucket_size": 5e8,
-#             "contiguous_gradients": True
-#         },
-#         "train_batch_size" : 10,
-#     }
-#     model = deepspeed.initialize(model=model, config_params=ds_config)
 
     return tokenizer, model
 
@@ -209,27 +186,31 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
         return result
 
     def tokenize_fn(examples):
-        result = tokenizer(
-            examples[text_column_name],
-            padding=pad,
-            truncation=True,
-            max_length=cfg.dataset.block_size,
-        )
-        result["labels"] = result["input_ids"].copy()
-        return result
+#         result = tokenizer(
+#             examples[text_column_name],
+#             padding=pad,
+#             truncation=True,
+#             max_length=cfg.dataset.block_size,
+#         )
+#         result["labels"] = result["input_ids"].copy()
+#         return result
+        return tokenizer(examples[text_column_name])
 
     with accelerator.main_process_first():
 
+        # breakpoint()
         tokenized_datasets = raw_datasets.map(
             tokenize_fn,
             batched=True,
+            remove_columns=text_column_name,
             num_proc=cfg.tokenizer.preprocessing_num_workers,
             load_from_cache_file=not cfg.dataset.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
 
+        # lm_datasets = tokenized_datasets.map(group_texts,batched=True,num_proc=cfg.tokenizer.preprocessing_num_workers,load_from_cache_file=not cfg.dataset.overwrite_cache,desc=f"Grouping texts in chunks of {cfg.dataset.block_size}")
         if cfg.dataset.concatenate_raw is True:
-            tokenized_datasets = tokenized_datasets.map(
+            lm_datasets = tokenized_datasets.map(
                 group_texts,
                 batched=True,
                 num_proc=cfg.tokenizer.preprocessing_num_workers,
@@ -237,7 +218,7 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
                 desc=f"Grouping texts in chunks of {cfg.dataset.block_size}",
             )
 
-    return tokenized_datasets
+    return lm_datasets
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -354,9 +335,9 @@ def main(cfg: DictConfig):
     if cfg.tracking.enabled is True and accelerator.is_main_process:
         experiment_config = vars(cfg)
         # TensorBoard cannot log Enums, need the raw value
-        #experiment_config["lr_scheduler_type"] = experiment_config[
-        #    "lr_scheduler_type"
-        #].value
+        # experiment_config["lr_scheduler_type"] = experiment_config[
+        #     "lr_scheduler_type"
+        # ].value
         accelerator.init_trackers("finetune_using_clm", experiment_config)
 
     logger.info("***** Running training *****")
@@ -467,6 +448,8 @@ def main(cfg: DictConfig):
                 if accelerator.is_main_process:
                     tokenizer.save_pretrained(output_dir)
 
+                model.train()
+
         if cfg.tracking.enabled is True:
             accelerator.log(
                 {
@@ -491,7 +474,11 @@ def main(cfg: DictConfig):
         )
         if accelerator.is_main_process:
             tokenizer.save_pretrained(cfg.output_dir)
-
+    
+    print('Pushing Model weights and other related files to Hugging Face Hub')
+    model.push_to_hub(f"kmfoda/{cfg.output_dir}", private = True) 
+    print('Pushing the Tokenizer and related files to Hugging Face Hub')
+    tokenizer.push_to_hub(f"kmfoda/{cfg.output_dir}", private = True) 
 
 if __name__ == "__main__":
     main()
